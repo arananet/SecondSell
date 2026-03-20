@@ -158,15 +158,91 @@ function goToStep(n) {
 }
 
 // ─── STEP 1: Photo capture / upload ──────────────────
-function triggerCamera() {
+
+// ── In-browser camera (MediaDevices API) ───────────────────────────────────
+// Using getUserMedia() keeps the camera inside the browser page, completely
+// avoiding the Android/iOS lifecycle bug where the OS kills/discards the browser
+// tab while an external camera app is in the foreground.
+// Falls back to a file-input if the API is unavailable or permission is denied.
+
+let _cameraStream  = null;
+let _cameraFacing  = 'environment'; // 'environment' = rear, 'user' = front
+
+async function triggerCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    // API not available (insecure context, old browser) — use file input fallback
+    _fallbackCameraInput();
+    return;
+  }
+  try {
+    await _startCameraStream(_cameraFacing);
+  } catch (err) {
+    console.warn('getUserMedia failed, falling back to file input:', err.message);
+    _fallbackCameraInput();
+  }
+}
+
+function _fallbackCameraInput() {
   const input = document.getElementById('camera-input');
-  // Reset BEFORE clicking so the same photo can be taken a second time.
-  // Resetting AFTER the change event (while a fetch is in flight) causes iOS Safari
-  // to delete the backing temp camera file before the upload body is read.
   input.value = '';
   input.click();
 }
 
+async function _startCameraStream(facingMode) {
+  // Stop any existing stream first
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+  _cameraStream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode,
+      width:  { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+    audio: false,
+  });
+  const video = document.getElementById('camera-preview');
+  video.srcObject = _cameraStream;
+  document.getElementById('camera-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+async function flipCamera() {
+  _cameraFacing = _cameraFacing === 'environment' ? 'user' : 'environment';
+  try {
+    await _startCameraStream(_cameraFacing);
+  } catch {
+    // device only has one camera — flip back silently
+    _cameraFacing = _cameraFacing === 'environment' ? 'user' : 'environment';
+  }
+}
+
+function closeCameraModal() {
+  document.getElementById('camera-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('camera-preview');
+  const canvas = document.getElementById('camera-canvas');
+  if (!video.videoWidth) { showToast('Camera not ready yet — try again.'); return; }
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  closeCameraModal();
+  canvas.toBlob(blob => {
+    if (!blob) { showToast('Failed to capture photo. Please try again.'); return; }
+    const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    uploadSingleImage(file);
+  }, 'image/jpeg', 0.92);
+}
+
+// ── Gallery & file-input fallback ───────────────────────────────────────────
 function triggerGallery() {
   const input = document.getElementById('gallery-input');
   input.value = '';
@@ -178,9 +254,6 @@ document.getElementById('gallery-input').addEventListener('change', handleFiles)
 
 function handleFiles(e) {
   const files = Array.from(e.target.files);
-  // Do NOT reset e.target.value here — it is already reset in triggerCamera/triggerGallery
-  // before the next click, so iOS cannot delete the temp file while the upload is reading it.
-
   if (!files.length) return;
 
   const canAdd = 10 - uploadedImages.length - pendingUploads;

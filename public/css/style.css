@@ -101,6 +101,94 @@ body {
 .badge-ok { background: #dcfce7; color: #166534; }
 .badge-error { background: #fee2e2; color: #991b1b; }
 
+/* ===== In-browser Camera Modal ===== */
+.camera-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.camera-modal.hidden { display: none; }
+
+.camera-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
+}
+.camera-label {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.camera-btn-cancel,
+.camera-btn-flip {
+  background: rgba(255,255,255,0.18);
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, transform 0.12s;
+}
+.camera-btn-cancel:active,
+.camera-btn-flip:active { transform: scale(0.9); background: rgba(255,255,255,0.3); }
+
+#camera-preview {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-controls {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 28px 24px calc(28px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
+}
+
+.btn-shutter {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid rgba(255,255,255,0.45);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.25), 0 4px 20px rgba(0,0,0,0.4);
+  transition: transform 0.12s, background 0.1s;
+  outline: none;
+}
+.btn-shutter:active {
+  transform: scale(0.88);
+  background: rgba(255,255,255,0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-shutter { transition: none; }
+  .camera-btn-cancel, .camera-btn-flip { transition: none; }
+}
+
 /* ===== Confirm Modal ===== */
 .confirm-modal-overlay {
   position: fixed; inset: 0;

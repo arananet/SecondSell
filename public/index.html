@@ -221,6 +221,28 @@
         </div>
       </div>
     </div>
+
+    <!-- In-browser Camera Modal
+         Uses MediaDevices.getUserMedia() so the camera stays INSIDE the browser.
+         Avoids the Android/iOS lifecycle bug where the OS kills the browser tab
+         when an external camera app is launched via capture="environment".
+    -->
+    <div id="camera-modal" class="camera-modal hidden" role="dialog" aria-modal="true" aria-label="Camera">
+      <div class="camera-header">
+        <button class="camera-btn-cancel" id="btn-cancel-camera" onclick="closeCameraModal()" aria-label="Cancel">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <span class="camera-label">Take Photo</span>
+        <button class="camera-btn-flip" id="btn-flip-camera" onclick="flipCamera()" aria-label="Flip camera">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+        </button>
+      </div>
+      <video id="camera-preview" autoplay playsinline muted></video>
+      <canvas id="camera-canvas" style="display:none"></canvas>
+      <div class="camera-controls">
+        <button class="btn-shutter" id="btn-shutter" onclick="capturePhoto()" aria-label="Take photo"></button>
+      </div>
+    </div>
   </div>
 
   <script src="/js/app.js"></script>

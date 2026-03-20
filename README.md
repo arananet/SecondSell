@@ -294,7 +294,7 @@ Create a WooCommerce product via REST API.
 
 ## Developer
 
-**Eduardo Arana** — [SecondSell](https://secondsell.app)
+**Eduardo Arana & Soda [bot]**
 
 ---
 

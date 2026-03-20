@@ -158,15 +158,28 @@ function goToStep(n) {
 }
 
 // ─── STEP 1: Photo capture / upload ──────────────────
-function triggerCamera()  { document.getElementById('camera-input').click(); }
-function triggerGallery() { document.getElementById('gallery-input').click(); }
+function triggerCamera() {
+  const input = document.getElementById('camera-input');
+  // Reset BEFORE clicking so the same photo can be taken a second time.
+  // Resetting AFTER the change event (while a fetch is in flight) causes iOS Safari
+  // to delete the backing temp camera file before the upload body is read.
+  input.value = '';
+  input.click();
+}
+
+function triggerGallery() {
+  const input = document.getElementById('gallery-input');
+  input.value = '';
+  input.click();
+}
 
 document.getElementById('camera-input').addEventListener('change',  handleFiles);
 document.getElementById('gallery-input').addEventListener('change', handleFiles);
 
 function handleFiles(e) {
   const files = Array.from(e.target.files);
-  e.target.value = ''; // reset immediately so camera input fires again next time
+  // Do NOT reset e.target.value here — it is already reset in triggerCamera/triggerGallery
+  // before the next click, so iOS cannot delete the temp file while the upload is reading it.
 
   if (!files.length) return;
 

@@ -50,9 +50,15 @@ function targetDimensions(width, height) {
  * Returns { data: Buffer, info: SharpOutputInfo, orientation, aspect }
  */
 async function optimise(buffer) {
-  // Read metadata AFTER auto-rotate to get the display dimensions
-  const meta = await sharp(buffer).rotate().metadata();
-  const { w, h, orientation, aspect } = targetDimensions(meta.width, meta.height);
+  // sharp().metadata() always returns the *source* file metadata regardless of chained
+  // operations — .rotate() in a chain does NOT affect what metadata() reports.
+  // EXIF orientation codes 5–8 mean the sensor stored the frame rotated 90° or 270°,
+  // so the stored width/height are transposed relative to the display dimensions.
+  const meta = await sharp(buffer).metadata();
+  const isRotated90or270 = meta.orientation != null && meta.orientation >= 5;
+  const displayWidth  = isRotated90or270 ? meta.height : meta.width;
+  const displayHeight = isRotated90or270 ? meta.width  : meta.height;
+  const { w, h, orientation, aspect } = targetDimensions(displayWidth, displayHeight);
 
   const { data, info } = await sharp(buffer)
     .rotate()                                     // fix EXIF orientation first

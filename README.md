@@ -5,6 +5,16 @@ listings with Claude AI, and publish them in seconds — without touching the sl
 
 ---
 
+## Screenshot
+
+<p align="center">
+  <img src="images/Screenshot_2026-03-20-17-05-16-436_com.android.chrome.jpg" alt="SecondSell running on Android Chrome" width="320" />
+</p>
+
+> Running on Android Chrome. The app lives entirely inside the browser — no native install required.
+
+---
+
 ## How It Works
 
 ```
@@ -131,6 +141,30 @@ For camera access on iOS/Android, use HTTPS (e.g. ngrok) — browsers require HT
 3. Set all env vars in Railway → Service → **Variables**
 
 > **No Railway Volume needed** — images live in WordPress's own media library.
+
+---
+
+## Repository Layout
+
+```
+/
+├── images/                    ← screenshots and documentation assets (committed to git)
+├── public/                    ← frontend (vanilla JS, mobile-first, no bundler)
+│   ├── index.html
+│   ├── login.html
+│   ├── css/style.css
+│   └── js/app.js
+├── routes/                    ← Express route handlers
+│   ├── upload.js              ← Sharp pipeline + optional background removal
+│   ├── ai.js                  ← Claude claude-sonnet-4-6
+│   ├── products.js            ← WooCommerce product/category API
+│   ├── auth.js                ← Login / logout
+│   └── health.js              ← WP/WC reachability check
+├── middleware/auth.js          ← HMAC-SHA256 cookie session guard
+├── utils/wcApi.js             ← WP + WC REST API client
+├── server.js                  ← Express app entry point
+└── .env.example               ← environment variable template
+```
 
 ---
 

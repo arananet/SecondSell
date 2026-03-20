@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#6c47ff" />
+  <title>SecondSell — Quick Product Uploader</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <div id="app">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-inner">
+        <span class="logo">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          SecondSell
+        </span>
+        <div class="header-right">
+          <span id="api-status" class="badge badge-checking">Checking&hellip;</span>
+          <button class="btn-logout" onclick="logout()" aria-label="Sign out">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Out
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Steps indicator -->
+    <nav class="steps-nav" aria-label="Steps">
+      <div class="step active" data-step="1">
+        <span class="step-num">1</span>
+        <span class="step-label">Photos</span>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step" data-step="2">
+        <span class="step-num">2</span>
+        <span class="step-label">Details</span>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step" data-step="3">
+        <span class="step-num">3</span>
+        <span class="step-label">AI Description</span>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step" data-step="4">
+        <span class="step-num">4</span>
+        <span class="step-label">Publish</span>
+      </div>
+    </nav>
+
+    <main class="main-content" id="main-content">
+
+      <!-- STEP 1: Photos -->
+      <section id="step-1" class="step-panel active">
+        <h2 class="step-title">Add Product Photos</h2>
+        <p class="step-desc">Take photos or upload from your gallery. Up to 10 images.</p>
+
+        <div class="photo-actions">
+          <button class="btn btn-camera" id="btn-camera" onclick="triggerCamera()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Take Photo
+          </button>
+          <button class="btn btn-outline" onclick="triggerGallery()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Gallery
+          </button>
+        </div>
+
+        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" />
+        <input type="file" id="gallery-input" accept="image/*" multiple style="display:none" />
+
+        <div id="photo-preview-grid" class="photo-grid"></div>
+
+        <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
+
+        <div class="step-nav">
+          <button class="btn btn-primary" id="btn-step1-next" onclick="goToStep(2)" disabled>
+            Next: Product Details →
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 2: Product Details -->
+      <section id="step-2" class="step-panel">
+        <h2 class="step-title">Product Details</h2>
+        <p class="step-desc">Tell us about the item so the AI can write a great description.</p>
+
+        <div class="form-group">
+          <label for="product-name">Product Name *</label>
+          <input type="text" id="product-name" class="input" placeholder="e.g. Sony WH-1000XM4 Headphones" autocomplete="off" />
+        </div>
+
+        <div class="form-group">
+          <label for="product-condition">Condition *</label>
+          <select id="product-condition" class="input">
+            <option value="like_new">Like New</option>
+            <option value="good" selected>Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+            <option value="new">Brand New</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="product-quantity">Quantity *</label>
+          <input type="number" id="product-quantity" class="input" value="1" min="1" step="1" />
+        </div>
+
+        <div class="form-group">
+          <label for="product-category">Category</label>
+          <select id="product-category" class="input">
+            <option value="">Loading categories…</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="product-context">Additional Notes <span class="optional">(optional)</span></label>
+          <textarea id="product-context" class="input textarea" rows="4"
+            placeholder="Any extra info: accessories included, reason for selling, purchase date, etc."></textarea>
+        </div>
+
+        <div class="step-nav">
+          <button class="btn btn-outline" onclick="goToStep(1)">← Back</button>
+          <button class="btn btn-primary" id="btn-generate" onclick="generateDescription()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            Generate Description
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 3: AI Description -->
+      <section id="step-3" class="step-panel">
+        <h2 class="step-title">AI-Generated Description</h2>
+        <p class="step-desc">Review and edit before publishing. Everything is editable.</p>
+
+        <div id="ai-loading" class="ai-loading hidden">
+          <div class="spinner"></div>
+          <p>Researching product and crafting description…</p>
+        </div>
+
+        <div id="ai-result" class="hidden">
+          <div class="form-group">
+            <label for="edit-title">Product Title</label>
+            <input type="text" id="edit-title" class="input" />
+          </div>
+
+          <div class="form-group">
+            <label for="edit-short-desc">Short Description <span class="optional">(SEO snippet)</span></label>
+            <textarea id="edit-short-desc" class="input textarea" rows="3"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-full-desc">Full Description <span class="optional">(HTML)</span></label>
+            <textarea id="edit-full-desc" class="input textarea tall" rows="12"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-sku">SKU</label>
+            <input type="text" id="edit-sku" class="input" />
+          </div>
+
+          <div class="form-group">
+            <label for="edit-tags">Tags <span class="optional">(comma separated)</span></label>
+            <input type="text" id="edit-tags" class="input" />
+          </div>
+        </div>
+
+        <div class="step-nav">
+          <button class="btn btn-outline" onclick="goToStep(2)">← Back</button>
+          <button class="btn btn-primary" id="btn-step3-next" onclick="goToStep(4)" disabled>
+            Next: Set Price →
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 4: Price & Publish -->
+      <section id="step-4" class="step-panel">
+        <h2 class="step-title">Price &amp; Publish</h2>
+
+        <div class="summary-card" id="product-summary"></div>
+
+        <div class="form-group">
+          <label for="product-price">
+            Price (USD)
+            <span class="optional" id="suggested-price-label"></span>
+          </label>
+          <div class="price-input-wrap">
+            <span class="currency-symbol">$</span>
+            <input type="number" id="product-price" class="input price-input" min="0" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+
+        <div class="step-nav">
+          <button class="btn btn-outline" onclick="goToStep(3)">← Back</button>
+          <button class="btn btn-success" id="btn-publish" onclick="publishProduct()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+            Publish to WooCommerce
+          </button>
+        </div>
+
+        <div id="publish-result" class="hidden"></div>
+      </section>
+
+    </main>
+
+    <footer class="app-footer">
+      SecondSell &mdash; Powered by Claude AI &mdash; Developed by Eduardo Arana
+    </footer>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="confirm-modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="confirm-modal-box">
+        <h3 id="confirm-modal-title"></h3>
+        <p id="confirm-modal-message"></p>
+        <div class="confirm-modal-actions">
+          <button class="btn btn-outline" id="confirm-modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="confirm-modal-ok">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

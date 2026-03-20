@@ -1,0 +1,98 @@
+const express = require('express');
+const router = express.Router();
+const { createProduct, getOrCreateCategory, getCategories, skuExists } = require('../utils/wcApi');
+
+/**
+ * GET /api/products/categories
+ * Returns all WooCommerce categories as [{ id, name, count }].
+ */
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await getCategories();
+    res.json({ success: true, categories });
+  } catch (err) {
+    console.error('Failed to fetch categories:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/products
+ *
+ * Creates a WooCommerce simple product via the WC REST API.
+ * The API handles all DB writes (wp_posts, wp_postmeta, wp_wc_product_meta_lookup),
+ * cache clearing, and hook firing automatically.
+ *
+ * Body:
+ * {
+ *   title: string,                           required
+ *   shortDescription: string,
+ *   fullDescription: string,                 HTML
+ *   price: string,                           e.g. "49.99"
+ *   sku: string,
+ *   images: [{ id, url, width, height }],    WP attachment IDs from /api/upload
+ *   tags: string[]
+ * }
+ */
+router.post('/', async (req, res) => {
+  const {
+    title,
+    shortDescription = '',
+    fullDescription = '',
+    price = '',
+    sku = '',
+    quantity = 1,
+    categoryId,
+    images = [],
+    tags = [],
+  } = req.body;
+
+  if (!title) {
+    return res.status(400).json({ error: 'title is required' });
+  }
+
+  try {
+    // Check for duplicate SKU before doing anything else
+    if (sku) {
+      const existingId = await skuExists(sku);
+      if (existingId) {
+        return res.status(409).json({
+          error: `SKU "${sku}" is already used by product #${existingId}. Please edit the SKU and try again.`,
+          code: 'sku_duplicate',
+          existingProductId: existingId,
+        });
+      }
+    }
+
+    // Use the provided category ID or fall back to "Others"
+    const resolvedCategoryId = categoryId
+      ? parseInt(categoryId, 10)
+      : await getOrCreateCategory('Others');
+
+    // Create the product via WC REST API
+    const product = await createProduct({
+      title,
+      shortDescription,
+      fullDescription,
+      price,
+      sku,
+      quantity: Math.max(1, parseInt(quantity, 10) || 1),
+      images,
+      tags,
+      categoryId: resolvedCategoryId,
+    });
+
+    res.json({
+      success: true,
+      productId: product.id,
+      slug: product.slug,
+      permalink: product.permalink,
+      message: `Product "${title}" created with ID ${product.id}`,
+    });
+  } catch (err) {
+    console.error('Product creation error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;

@@ -6,6 +6,13 @@ let currentStep    = 1;
 let uploadedImages = [];  // { id, url, width, height, orientation, aspect, sizeKb }
 let pendingUploads = 0;   // number of images currently uploading
 let aiData         = null;
+let bgRemovalEnabled = false; // whether to run server-side background removal
+
+function onBgRemovalToggle(checked) {
+  bgRemovalEnabled = checked;
+  const row = document.getElementById('bg-removal-row');
+  if (row) row.classList.toggle('toggle-row--on', checked);
+}
 
 // ─── API helper ───────────────────────────────────────
 // Wraps fetch() and redirects to /login.html on 401.
@@ -275,6 +282,7 @@ async function uploadSingleImage(file) {
 
   const formData = new FormData();
   formData.append('images', file);
+  formData.append('removeBackground', bgRemovalEnabled ? '1' : '0');
 
   try {
     const resp = await apiFetch('/api/upload', { method: 'POST', body: formData });
@@ -535,6 +543,10 @@ function resetApp() {
   uploadedImages = [];
   pendingUploads = 0;
   aiData         = null;
+  bgRemovalEnabled = false;
+  const tog = document.getElementById('toggle-bg-removal');
+  if (tog) tog.checked = false;
+  document.getElementById('bg-removal-row')?.classList.remove('toggle-row--on');
   document.getElementById('product-name').value      = '';
   document.getElementById('product-condition').value = 'good';
   document.getElementById('product-quantity').value  = '1';

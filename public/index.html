@@ -69,6 +69,21 @@
           </button>
         </div>
 
+        <!-- Background removal toggle -->
+        <label class="toggle-row" for="toggle-bg-removal" id="bg-removal-row">
+          <span class="toggle-label">
+            <span class="toggle-label-main">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M8 12h8M12 8v8"/></svg>
+              Remove Background
+            </span>
+            <span class="toggle-label-sub">AI replaces background with white</span>
+          </span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="toggle-bg-removal" onchange="onBgRemovalToggle(this.checked)" />
+            <span class="toggle-track"></span>
+          </span>
+        </label>
+
         <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" />
         <input type="file" id="gallery-input" accept="image/*" multiple style="display:none" />
 

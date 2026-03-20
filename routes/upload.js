@@ -16,6 +16,23 @@ const upload = multer({
   },
 });
 
+// ── Background removal (lazy-loaded ESM module) ──────────────────────────────
+// @imgly/background-removal-node uses ONNX models that are downloaded on first
+// call and cached. Wrapped in a lazy singleton so the download happens once.
+let _removeBgFn = undefined;
+async function getRemoveBgFn() {
+  if (_removeBgFn !== undefined) return _removeBgFn;
+  try {
+    const mod = await import('@imgly/background-removal-node');
+    _removeBgFn = mod.removeBackground ?? mod.default;
+    console.log('Background removal module loaded.');
+  } catch (e) {
+    console.warn('Background removal unavailable:', e.message);
+    _removeBgFn = null;
+  }
+  return _removeBgFn;
+}
+
 /**
  * Detect image orientation and return target dimensions.
  *
@@ -43,25 +60,42 @@ function targetDimensions(width, height) {
 
 /**
  * Optimise an image buffer:
- *   1. Auto-rotate from EXIF
- *   2. Detect orientation → resize to exact target aspect ratio (cover + smart crop)
- *   3. Encode to WebP at quality 80
+ *   1. Auto-rotate from EXIF (produces a correctly-oriented buffer)
+ *   2. Optionally remove background → flatten alpha onto white
+ *   3. Detect orientation → resize to exact target aspect ratio (cover + smart crop)
+ *   4. Encode to WebP at quality 72
  *
  * Returns { data: Buffer, info: SharpOutputInfo, orientation, aspect }
  */
-async function optimise(buffer) {
-  // sharp().metadata() always returns the *source* file metadata regardless of chained
-  // operations — .rotate() in a chain does NOT affect what metadata() reports.
-  // EXIF orientation codes 5–8 mean the sensor stored the frame rotated 90° or 270°,
-  // so the stored width/height are transposed relative to the display dimensions.
-  const meta = await sharp(buffer).metadata();
-  const isRotated90or270 = meta.orientation != null && meta.orientation >= 5;
-  const displayWidth  = isRotated90or270 ? meta.height : meta.width;
-  const displayHeight = isRotated90or270 ? meta.width  : meta.height;
-  const { w, h, orientation, aspect } = targetDimensions(displayWidth, displayHeight);
+async function optimise(buffer, doRemoveBg = false) {
+  // Materialise the EXIF-rotated buffer first so every downstream step
+  // (including bg removal) works on display-orientation pixels.
+  const rotatedBuffer = await sharp(buffer).rotate().toBuffer();
+  const meta = await sharp(rotatedBuffer).metadata();
+  const { w, h, orientation, aspect } = targetDimensions(meta.width, meta.height);
 
-  const { data, info } = await sharp(buffer)
-    .rotate()                                     // fix EXIF orientation first
+  let sourceBuffer = rotatedBuffer;
+
+  if (doRemoveBg) {
+    const removeBg = await getRemoveBgFn();
+    if (removeBg) {
+      try {
+        const blob = await removeBg(rotatedBuffer);
+        const pngBuf = Buffer.from(await blob.arrayBuffer());
+        // Flatten PNG alpha channel onto a white background.
+        // Sharp's .flatten() composites the alpha channel over the given colour.
+        sourceBuffer = await sharp(pngBuf)
+          .flatten({ background: { r: 255, g: 255, b: 255 } })
+          .toBuffer();
+      } catch (e) {
+        console.warn('Background removal failed, using original image:', e.message);
+        // fall through with rotated original
+      }
+    }
+  }
+
+  const { data, info } = await sharp(sourceBuffer)
+    // sourceBuffer is already correctly rotated; do NOT call .rotate() again.
     .resize(w, h, {
       fit: 'cover',                               // fill target box, crop excess
       position: sharp.strategy.attention,         // smart crop: keep faces / focal points
@@ -100,11 +134,13 @@ router.post('/', upload.array('images', 10), async (req, res) => {
     return res.status(400).json({ error: 'No images provided' });
   }
 
+  const doRemoveBg = req.body.removeBackground === '1';
+
   try {
     const results = [];
 
     for (const file of req.files) {
-      const { data, info, orientation, aspect } = await optimise(file.buffer);
+      const { data, info, orientation, aspect } = await optimise(file.buffer, doRemoveBg);
       const filename = `${uuidv4()}.webp`;
       const wpMedia = await uploadMedia(data, filename);
 

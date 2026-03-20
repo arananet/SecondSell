@@ -101,6 +101,75 @@ body {
 .badge-ok { background: #dcfce7; color: #166534; }
 .badge-error { background: #fee2e2; color: #991b1b; }
 
+/* ===== Background-removal toggle row ===== */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 10px 0 0;
+  cursor: pointer;
+  user-select: none;
+  min-height: 56px;
+  transition: border-color 0.2s, background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.toggle-row--on {
+  border-color: var(--primary);
+  background: rgba(108, 71, 255, 0.05);
+}
+.toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.toggle-label-main {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.toggle-label-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.toggle-switch {
+  position: relative;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.toggle-switch input { display: none; }
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: #d1d5db;
+  border-radius: 14px;
+  transition: background 0.2s;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+  transition: transform 0.2s;
+}
+.toggle-switch input:checked + .toggle-track { background: var(--primary); }
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(22px); }
+@media (prefers-reduced-motion: reduce) {
+  .toggle-track, .toggle-track::after { transition: none; }
+  .toggle-row { transition: none; }
+}
+
 /* ===== In-browser Camera Modal ===== */
 .camera-modal {
   position: fixed;

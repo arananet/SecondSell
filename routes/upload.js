@@ -162,4 +162,57 @@ router.post('/', upload.array('images', 10), async (req, res) => {
   }
 });
 
+/**
+ * POST /api/upload/rotate
+ *
+ * Rotates an already-uploaded image by the specified degrees (90, 180, 270).
+ * Downloads the image from WP, rotates with Sharp, re-uploads, returns new image data.
+ *
+ * Body: { imageUrl: string, degrees: 90|180|270 }
+ * Returns: { id, url, width, height, orientation, aspect, sizeKb }
+ */
+router.post('/rotate', async (req, res) => {
+  const { imageUrl, degrees } = req.body;
+  const validDegrees = [90, 180, 270];
+
+  if (!imageUrl || !validDegrees.includes(degrees)) {
+    return res.status(400).json({ error: 'imageUrl and degrees (90, 180, 270) are required' });
+  }
+
+  try {
+    // Download the image from WP
+    const imgResp = await fetch(imageUrl);
+    if (!imgResp.ok) throw new Error(`Failed to download image (${imgResp.status})`);
+    const arrayBuf = await imgResp.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+
+    // Rotate with Sharp, then re-encode as WebP
+    const rotated = sharp(buffer).rotate(degrees);
+    const meta = await rotated.metadata();
+    // After rotation, metadata may not reflect the new dimensions yet, so
+    // we get them from the output buffer.
+    const { data, info } = await rotated
+      .webp({ quality: 72, effort: 4 })
+      .toBuffer({ resolveWithObject: true });
+
+    const { w, h, orientation, aspect } = targetDimensions(info.width, info.height);
+
+    const filename = `${uuidv4()}.webp`;
+    const wpMedia = await uploadMedia(data, filename);
+
+    res.json({
+      id: wpMedia.id,
+      url: wpMedia.url,
+      width: wpMedia.width ?? info.width,
+      height: wpMedia.height ?? info.height,
+      orientation,
+      aspect,
+      sizeKb: Math.round(info.size / 1024),
+    });
+  } catch (err) {
+    console.error('Rotate error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

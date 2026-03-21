@@ -3,6 +3,7 @@ const router = express.Router();
 const Anthropic = require('@anthropic-ai/sdk');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const AI_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 router.post('/describe', async (req, res) => {
   const { productName, condition, userContext, imageUrls = [] } = req.body;
@@ -47,7 +48,7 @@ Return ONLY this JSON (no markdown fences):
 
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: AI_MODEL,
       max_tokens: 2048,
       messages: [{ role: 'user', content: userPrompt }],
       system: systemPrompt,

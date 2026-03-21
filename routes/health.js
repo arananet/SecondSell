@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
 
   // Claude API configured?
   result.claude = process.env.ANTHROPIC_API_KEY ? 'configured' : 'not configured';
+  result.aiModel = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
   if (!process.env.ANTHROPIC_API_KEY) result.status = 'degraded';
 
   res.status(result.status === 'ok' ? 200 : 503).json(result);

@@ -255,7 +255,11 @@
       <video id="camera-preview" autoplay playsinline muted></video>
       <canvas id="camera-canvas" style="display:none"></canvas>
       <div class="camera-controls">
+        <button class="camera-btn-rotate" id="btn-rotate-camera" onclick="rotateCameraPreview()" aria-label="Rotate image">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
         <button class="btn-shutter" id="btn-shutter" onclick="capturePhoto()" aria-label="Take photo"></button>
+        <div class="camera-btn-spacer"></div>
       </div>
     </div>
   </div>

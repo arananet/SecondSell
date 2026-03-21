@@ -174,6 +174,7 @@ function goToStep(n) {
 
 let _cameraStream  = null;
 let _cameraFacing  = 'environment'; // 'environment' = rear, 'user' = front
+let _cameraRotation = 0; // 0, 90, 180, 270 — applied at capture time
 
 async function triggerCamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -211,6 +212,8 @@ async function _startCameraStream(facingMode) {
   });
   const video = document.getElementById('camera-preview');
   video.srcObject = _cameraStream;
+  _cameraRotation = 0;
+  video.style.transform = '';
   document.getElementById('camera-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -223,6 +226,12 @@ async function flipCamera() {
     // device only has one camera — flip back silently
     _cameraFacing = _cameraFacing === 'environment' ? 'user' : 'environment';
   }
+}
+
+function rotateCameraPreview() {
+  _cameraRotation = (_cameraRotation + 90) % 360;
+  const video = document.getElementById('camera-preview');
+  video.style.transform = `rotate(${_cameraRotation}deg)`;
 }
 
 function closeCameraModal() {
@@ -238,9 +247,21 @@ function capturePhoto() {
   const video  = document.getElementById('camera-preview');
   const canvas = document.getElementById('camera-canvas');
   if (!video.videoWidth) { showToast('Camera not ready yet — try again.'); return; }
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  const isRotated90 = _cameraRotation === 90 || _cameraRotation === 270;
+
+  canvas.width  = isRotated90 ? vh : vw;
+  canvas.height = isRotated90 ? vw : vh;
+
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((_cameraRotation * Math.PI) / 180);
+  ctx.drawImage(video, -vw / 2, -vh / 2);
+  ctx.restore();
+
   closeCameraModal();
   canvas.toBlob(blob => {
     if (!blob) { showToast('Failed to capture photo. Please try again.'); return; }
@@ -314,13 +335,16 @@ function renderPhotoGrid() {
   const grid = document.getElementById('photo-preview-grid');
   grid.innerHTML = '';
 
-  // Uploaded images with remove button
+  // Uploaded images with remove and rotate buttons
   uploadedImages.forEach((img, idx) => {
     const div = document.createElement('div');
     div.className = 'photo-thumb';
     div.innerHTML = `
       <img src="${escHtml(img.url)}" alt="Product photo ${idx + 1}" loading="lazy" />
       ${idx === 0 ? '<span class="badge-first">Cover</span>' : ''}
+      <button class="rotate-btn" onclick="rotatePhoto(${idx})" aria-label="Rotate photo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
       <button class="remove-btn" onclick="removePhoto(${idx})" aria-label="Remove photo">&#x2715;</button>
     `;
     grid.appendChild(div);
@@ -340,6 +364,38 @@ function removePhoto(idx) {
   renderPhotoGrid();
   updateNextButton();
   if (uploadedImages.length === 0 && pendingUploads === 0) setStatus('');
+}
+
+async function rotatePhoto(idx) {
+  const img = uploadedImages[idx];
+  if (!img) return;
+
+  // Mark thumbnail as rotating
+  const thumbs = document.querySelectorAll('.photo-thumb');
+  const thumb = thumbs[idx];
+  if (thumb) thumb.classList.add('photo-thumb--rotating');
+
+  try {
+    const resp = await apiFetch('/api/upload/rotate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: img.url, degrees: 90 }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `Rotate failed (${resp.status})`);
+    }
+
+    const newImg = await resp.json();
+    uploadedImages[idx] = newImg;
+    renderPhotoGrid();
+    showToast('Photo rotated', 'success');
+  } catch (err) {
+    if (err.message === 'Session expired') return;
+    showToast(`Rotate failed: ${err.message}`);
+    if (thumb) thumb.classList.remove('photo-thumb--rotating');
+  }
 }
 
 function updateNextButton() {
@@ -512,16 +568,17 @@ async function publishProduct() {
       </div>
     `;
     resultDiv.classList.remove('hidden');
+    btn.classList.add('hidden');
 
     setTimeout(() => {
       showConfirmModal({
-        title:       '🎉 Product Published!',
+        title:       'Product Published!',
         message:     'Would you like to add another product?',
         okLabel:     'Add Another',
         cancelLabel: 'Done',
         onOk:        resetApp,
       });
-    }, 2500);
+    }, 1500);
   } catch (err) {
     if (err.message === 'Session expired') return;
     resultDiv.innerHTML = `
@@ -533,8 +590,10 @@ async function publishProduct() {
     resultDiv.classList.remove('hidden');
     console.error(err);
   } finally {
-    btn.disabled  = false;
-    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg> Publish to WooCommerce';
+    if (!btn.classList.contains('hidden')) {
+      btn.disabled  = false;
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg> Publish to WooCommerce';
+    }
   }
 }
 
@@ -553,6 +612,7 @@ function resetApp() {
   document.getElementById('product-context').value   = '';
   document.getElementById('product-price').value     = '';
   document.getElementById('publish-result').classList.add('hidden');
+  document.getElementById('btn-publish').classList.remove('hidden');
   renderPhotoGrid();
   setStatus('');
   goToStep(1);

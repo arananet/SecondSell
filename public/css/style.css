@@ -655,9 +655,6 @@ body {
   opacity: 0.5;
   pointer-events: none;
 }
-.photo-thumb--rotating img {
-  animation: spin 0.7s linear infinite;
-}
 
 .photo-thumb .badge-first {
   position: absolute;

@@ -69,11 +69,17 @@ router.post('/', async (req, res) => {
       ? parseInt(categoryId, 10)
       : await getOrCreateCategory('Others');
 
+    // Append standard second-hand disclaimer to the product description
+    const disclaimer = `
+<hr />
+<p style="font-size:0.85em;color:#666;"><strong>Disclaimer — Sold As Is:</strong> All second-hand products are sold without any type of warranty. While we make every effort to ensure the information provided in this listing is accurate, some parts or components may not work as expected due to age and prior use. By purchasing this item, the buyer accepts full responsibility and acknowledges that no returns, refunds, or guarantees are offered.</p>`;
+    const fullDescWithDisclaimer = fullDescription + disclaimer;
+
     // Create the product via WC REST API
     const product = await createProduct({
       title,
       shortDescription,
-      fullDescription,
+      fullDescription: fullDescWithDisclaimer,
       price,
       sku,
       quantity: Math.max(1, parseInt(quantity, 10) || 1),

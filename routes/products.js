@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { createProduct, getOrCreateCategory, getCategories, skuExists } = require('../utils/wcApi');
+const {
+  createProduct,
+  getOrCreateCategory,
+  getCategories,
+  getShippingMethods,
+  skuExists,
+} = require('../utils/wcApi');
 
 /**
  * GET /api/products/categories
@@ -12,6 +18,20 @@ router.get('/categories', async (req, res) => {
     res.json({ success: true, categories });
   } catch (err) {
     console.error('Failed to fetch categories:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/products/shipping-methods
+ * Returns enabled WooCommerce shipping methods with their configured cost.
+ */
+router.get('/shipping-methods', async (req, res) => {
+  try {
+    const methods = await getShippingMethods();
+    res.json({ success: true, methods });
+  } catch (err) {
+    console.error('Failed to fetch shipping methods:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -45,10 +65,15 @@ router.post('/', async (req, res) => {
     categoryId,
     images = [],
     tags = [],
+    shippingMethodKey,
   } = req.body;
 
   if (!title) {
     return res.status(400).json({ error: 'title is required' });
+  }
+
+  if (!shippingMethodKey) {
+    return res.status(400).json({ error: 'shippingMethodKey is required' });
   }
 
   try {
@@ -69,6 +94,13 @@ router.post('/', async (req, res) => {
       ? parseInt(categoryId, 10)
       : await getOrCreateCategory('Others');
 
+    // Resolve selected shipping method to ensure it still exists on WC
+    const shippingMethods = await getShippingMethods();
+    const selectedShippingMethod = shippingMethods.find(m => m.key === shippingMethodKey);
+    if (!selectedShippingMethod) {
+      return res.status(400).json({ error: 'Selected shipping method is no longer available. Please reload and try again.' });
+    }
+
     // Append standard second-hand disclaimer to the product description
     const disclaimer = `
 <hr />
@@ -86,6 +118,7 @@ router.post('/', async (req, res) => {
       images,
       tags,
       categoryId: resolvedCategoryId,
+      shippingMethod: selectedShippingMethod,
     });
 
     res.json({

@@ -122,7 +122,18 @@ async function getOrCreateCategory(name) {
  *
  * @returns {object} WooCommerce product object (full API response)
  */
-async function createProduct({ title, shortDescription, fullDescription, price, sku, quantity, images, tags, categoryId }) {
+async function createProduct({
+  title,
+  shortDescription,
+  fullDescription,
+  price,
+  sku,
+  quantity,
+  images,
+  tags,
+  categoryId,
+  shippingMethod,
+}) {
   const payload = {
     name: title,
     type: 'simple',
@@ -149,6 +160,26 @@ async function createProduct({ title, shortDescription, fullDescription, price, 
       alt: title,
     })),
   };
+
+  const meta = [];
+  if (shippingMethod) {
+    meta.push(
+      { key: '_secondsell_shipping_method_key', value: shippingMethod.key },
+      { key: '_secondsell_shipping_method_label', value: shippingMethod.title },
+      { key: '_secondsell_shipping_zone', value: shippingMethod.zoneName || '' },
+      {
+        key: '_secondsell_shipping_cost',
+        value:
+          shippingMethod.cost != null
+            ? `${shippingMethod.cost} ${shippingMethod.currency || ''}`.trim()
+            : shippingMethod.costExpression || '',
+      }
+    );
+  }
+
+  if (meta.length) {
+    payload.meta_data = meta;
+  }
 
   const resp = await fetch(`${base()}/wp-json/wc/v3/products`, {
     method: 'POST',
@@ -204,6 +235,67 @@ async function getCategories() {
   return all.map(c => ({ id: c.id, name: c.name, count: c.count }));
 }
 
+// ─── WooCommerce Shipping Methods ──────────────────────────────────────────
+
+/**
+ * Fetch enabled shipping methods (with cost info when available) across all zones.
+ * Returns [{ key, methodId, instanceId, title, zoneId, zoneName, cost, costExpression, currency }]
+ */
+async function getShippingMethods() {
+  const auth = wcAuth();
+  const apiBase = `${base()}/wp-json/wc/v3`;
+  const methods = [];
+
+  const zonesResp = await fetch(`${apiBase}/shipping/zones`, { headers: { Authorization: auth } });
+  if (!zonesResp.ok) {
+    const body = await zonesResp.text();
+    throw new Error(`WC shipping zones fetch failed (${zonesResp.status}): ${body.slice(0, 300)}`);
+  }
+
+  const zones = await zonesResp.json();
+  const allZones = [...zones, { id: 0, name: 'Rest of the world' }];
+
+  for (const zone of allZones) {
+    const resp = await fetch(`${apiBase}/shipping/zones/${zone.id}/methods`, {
+      headers: { Authorization: auth },
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error(
+        `WC shipping methods fetch failed for zone ${zone.id} (${resp.status}): ${body.slice(0, 300)}`
+      );
+    }
+
+    const zoneMethods = await resp.json();
+    for (const method of zoneMethods) {
+      if (!method?.enabled) continue;
+      const title = (method.settings?.title?.value || method.title || method.method_title || 'Shipping').trim();
+      const costRaw = method.settings?.cost?.value ?? method.settings?.amount?.value ?? '';
+      const parsedCost = /^[0-9.,]+$/.test(String(costRaw).trim())
+        ? Number.parseFloat(String(costRaw).replace(',', '.'))
+        : null;
+
+      methods.push({
+        key: `${zone.id}:${method.instance_id}`,
+        methodId: method.method_id,
+        instanceId: method.instance_id,
+        title,
+        zoneId: zone.id,
+        zoneName: zone.name || (zone.id === 0 ? 'Rest of the world' : ''),
+        cost: Number.isFinite(parsedCost) ? Number(parsedCost.toFixed(2)) : null,
+        costExpression: costRaw ?? '',
+        currency: process.env.WC_DEFAULT_CURRENCY || 'USD',
+      });
+    }
+  }
+
+  if (!methods.length) {
+    throw new Error('No shipping methods are enabled in WooCommerce.');
+  }
+
+  return methods;
+}
+
 /**
  * Check whether a SKU already exists in WooCommerce.
  * Returns the existing product ID if found, or null if free.
@@ -219,4 +311,12 @@ async function skuExists(sku) {
   return products.length > 0 ? products[0].id : null;
 }
 
-module.exports = { uploadMedia, getOrCreateCategory, getCategories, skuExists, createProduct, getProduct };
+module.exports = {
+  uploadMedia,
+  getOrCreateCategory,
+  getCategories,
+  getShippingMethods,
+  skuExists,
+  createProduct,
+  getProduct,
+};

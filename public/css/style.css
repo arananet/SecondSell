@@ -688,6 +688,12 @@ body {
   font-size: 0.8rem;
 }
 
+.input-hint {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .input {
   width: 100%;
   padding: 0.75rem 0.875rem;
@@ -798,6 +804,12 @@ body {
 .summary-card p {
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.summary-meta {
+  margin-top: 0.35rem;
+  color: var(--text);
+  font-weight: 600;
 }
 
 .summary-thumbs {

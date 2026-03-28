@@ -7,6 +7,7 @@ let uploadedImages = [];  // { id, url, width, height, orientation, aspect, size
 let pendingUploads = 0;   // number of images currently uploading
 let aiData         = null;
 let bgRemovalEnabled = false; // whether to run server-side background removal
+let shippingMethods  = [];
 
 function onBgRemovalToggle(checked) {
   bgRemovalEnabled = checked;
@@ -146,8 +147,88 @@ async function loadCategories() {
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('api-status')?.addEventListener('click', showHealthDebug);
+  document.getElementById('product-shipping')?.addEventListener('change', updateShippingHint);
   loadCategories();
+  loadShippingMethods();
 });
+
+// ─── Load WooCommerce shipping methods ─────────────────────────
+async function loadShippingMethods() {
+  const sel = document.getElementById('product-shipping');
+  const hint = document.getElementById('shipping-cost-hint');
+  if (!sel) return;
+  try {
+    const resp = await apiFetch('/api/products/shipping-methods');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const { methods } = await resp.json();
+    shippingMethods = Array.isArray(methods) ? methods : [];
+    if (!shippingMethods.length) throw new Error('No shipping methods returned');
+
+    sel.innerHTML = '';
+    let defaultKey = '';
+    shippingMethods.forEach(method => {
+      const opt = document.createElement('option');
+      opt.value = method.key;
+      opt.textContent = formatShippingOptionLabel(method);
+      sel.appendChild(opt);
+      if (!defaultKey && /normal/i.test(method.title || '')) defaultKey = method.key;
+    });
+
+    if (!defaultKey && shippingMethods.length) {
+      defaultKey = shippingMethods[0].key;
+    }
+
+    if (defaultKey) sel.value = defaultKey;
+    updateShippingHint();
+  } catch (err) {
+    console.warn('Could not load shipping methods:', err.message);
+    sel.innerHTML = '<option value="">Shipping unavailable</option>';
+    if (hint) {
+      hint.textContent = 'Unable to load shipping methods. Refresh the page to try again.';
+    }
+  }
+}
+
+function updateShippingHint() {
+  const hint = document.getElementById('shipping-cost-hint');
+  if (!hint) return;
+  const method = getSelectedShippingMethod();
+  if (!method) {
+    hint.textContent = 'Select a shipping method to continue.';
+    return;
+  }
+  const costText = formatShippingCost(method);
+  const zoneText = method.zoneName ? ` • ${method.zoneName}` : '';
+  hint.textContent = `Cost: ${costText}${zoneText}`;
+}
+
+function getSelectedShippingMethod() {
+  const sel = document.getElementById('product-shipping');
+  if (!sel) return null;
+  return shippingMethods.find(m => m.key === sel.value) || null;
+}
+
+function formatShippingOptionLabel(method) {
+  const costText = formatShippingCost(method);
+  const zoneText = method.zoneName ? ` • ${method.zoneName}` : '';
+  return costText ? `${method.title} — ${costText}${zoneText}` : `${method.title}${zoneText}`;
+}
+
+function formatShippingCost(method) {
+  if (typeof method?.cost === 'number' && Number.isFinite(method.cost)) {
+    return formatCurrency(method.cost, method.currency || 'USD');
+  }
+  if (method?.costExpression) {
+    return method.costExpression;
+  }
+  return 'No fixed cost';
+}
+
+function formatShippingSummary(method) {
+  const costText = formatShippingCost(method);
+  const zoneText = method.zoneName ? ` (${method.zoneName})` : '';
+  return `${method.title}${zoneText} — ${costText}`;
+}
 
 // ─── Step navigation ──────────────────────────────────
 function goToStep(n) {
@@ -495,6 +576,7 @@ function buildSummary() {
   const title     = document.getElementById('edit-title').value
                  || document.getElementById('product-name').value;
   const shortDesc = document.getElementById('edit-short-desc').value;
+  const shippingMethod = getSelectedShippingMethod();
 
   if (aiData?.suggestedPrice) {
     document.getElementById('suggested-price-label').textContent =
@@ -509,9 +591,14 @@ function buildSummary() {
     .map(i => `<img src="${escHtml(i.url)}" alt="" />`)
     .join('');
 
+  const shippingLine = shippingMethod
+    ? `<p class="summary-meta">${escHtml(formatShippingSummary(shippingMethod))}</p>`
+    : '';
+
   document.getElementById('product-summary').innerHTML = `
     <h3>${escHtml(title)}</h3>
     <p>${escHtml(shortDesc)}</p>
+    ${shippingLine}
     ${thumbs ? `<div class="summary-thumbs">${thumbs}</div>` : ''}
   `;
 }
@@ -523,6 +610,12 @@ async function publishProduct() {
   const price   = document.getElementById('product-price').value;
   const tagsRaw = document.getElementById('edit-tags').value;
   const tags    = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+  const selectedShippingMethod = getSelectedShippingMethod();
+  if (!selectedShippingMethod) {
+    showToast('Please select a shipping method.');
+    document.getElementById('product-shipping')?.focus();
+    return;
+  }
 
   const btn       = document.getElementById('btn-publish');
   const resultDiv = document.getElementById('publish-result');
@@ -545,6 +638,7 @@ async function publishProduct() {
         categoryId: document.getElementById('product-category').value || undefined,
         images:     uploadedImages,
         tags,
+        shippingMethodKey: selectedShippingMethod.key,
       }),
     });
 
@@ -604,6 +698,14 @@ function resetApp() {
   document.getElementById('product-quantity').value  = '1';
   document.getElementById('product-context').value   = '';
   document.getElementById('product-price').value     = '';
+  const shippingSelect = document.getElementById('product-shipping');
+  const shippingHint = document.getElementById('shipping-cost-hint');
+  if (shippingSelect) {
+    shippingSelect.innerHTML = '<option value="">Loading shipping methods…</option>';
+  }
+  if (shippingHint) {
+    shippingHint.textContent = 'Fetching available shipping rates…';
+  }
   document.getElementById('publish-result').classList.add('hidden');
   const publishBtn = document.getElementById('btn-publish');
   publishBtn.classList.remove('hidden');
@@ -611,6 +713,7 @@ function resetApp() {
   publishBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg> Publish to WooCommerce';
   renderPhotoGrid();
   setStatus('');
+  loadShippingMethods();
   goToStep(1);
 }
 
@@ -623,3 +726,16 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function formatCurrency(amount, currency = 'USD') {
+  if (typeof amount !== 'number' || Number.isNaN(amount)) return null;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(amount);
+  } catch (err) {
+    return `${currency} ${amount.toFixed(2)}`.trim();
+  }
+}

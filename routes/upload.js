@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const sharp = require('sharp');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const { uploadMedia } = require('../utils/wcApi');
 
 const upload = multer({
@@ -141,7 +141,7 @@ router.post('/', upload.array('images', 10), async (req, res) => {
 
     for (const file of req.files) {
       const { data, info, orientation, aspect } = await optimise(file.buffer, doRemoveBg);
-      const filename = `${uuidv4()}.webp`;
+      const filename = `${randomUUID()}.webp`;
       const wpMedia = await uploadMedia(data, filename);
 
       results.push({
@@ -179,6 +179,16 @@ router.post('/rotate', async (req, res) => {
     return res.status(400).json({ error: 'imageUrl and degrees (90, 180, 270) are required' });
   }
 
+  // SSRF guard: only fetch images that live on the configured WordPress site.
+  try {
+    const wpOrigin = new URL(process.env.WP_URL).origin;
+    if (new URL(imageUrl).origin !== wpOrigin) {
+      return res.status(400).json({ error: 'imageUrl must point to the configured WordPress site' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid imageUrl' });
+  }
+
   try {
     // Download the image from WP
     const imgResp = await fetch(imageUrl);
@@ -197,7 +207,7 @@ router.post('/rotate', async (req, res) => {
 
     const { w, h, orientation, aspect } = targetDimensions(info.width, info.height);
 
-    const filename = `${uuidv4()}.webp`;
+    const filename = `${randomUUID()}.webp`;
     const wpMedia = await uploadMedia(data, filename);
 
     res.json({

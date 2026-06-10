@@ -21,6 +21,11 @@ const crypto = require('crypto');
  */
 
 function _secret() {
+  // Prefer a dedicated signing secret so the HMAC key is decoupled from the
+  // login password. Falls back to user:pass for backward compatibility.
+  if (process.env.SESSION_SECRET) {
+    return Buffer.from(process.env.SESSION_SECRET, 'utf8');
+  }
   const u = process.env.BASIC_AUTH_USER;
   const p = process.env.BASIC_AUTH_PASS;
   if (!u || !p) throw new Error('BASIC_AUTH_USER and BASIC_AUTH_PASS must be set');
@@ -119,8 +124,10 @@ function authMiddleware(req, res, next) {
   return res.redirect('/login.html');
 }
 
-authMiddleware.makeToken           = makeToken;
+authMiddleware.makeToken             = makeToken;
 authMiddleware.timingSafeStringEqual = timingSafeStringEqual;
+authMiddleware.verifyToken           = verifyToken;
+authMiddleware.getSessionCookie      = getSessionCookie;
 
 module.exports = authMiddleware;
 
